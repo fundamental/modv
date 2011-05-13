@@ -1,9 +1,10 @@
 module donothing
 
 head:
-    a   in  log
+    a   in  logv[5]
     clk in  log
-    b   out log
+    b   out logv[5]
+    c   out logv[8]
 end
 
 arch:
@@ -11,5 +12,8 @@ arch:
 
     sync(clk) temp = a
 
-    b    = temp
+    b = temp
+
+    c = 0xfe
+
 end

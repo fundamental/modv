@@ -24,27 +24,35 @@
 
 (defun end-sync (&rest rest)
   (push (format nil "end if;~%end process;") *relations*))
-             
+
+(defun type-print (type x lim x)
+  (format nil "~a(~a downto 0)" type (1- (parse-integer lim))))
+
+(defun hex-to-bin (hex)
+  (print hex)
+  (format nil "X\"~X\"" (parse-integer (subseq hex 2) :radix 16)))
 
 (define-parser *parser*
   (:start-symbol module-file)
-  (:terminals (module end out in : symbol end head arch signal = synchronous open close))
+  (:terminals (module end out in : symbol end head arch signal = synchronous open close [ ] int hex))
   (module-file (module-declare head : ports end arch : statements end))
   (statements (statements statement)
               statement)
   (statement signal-declare
              sync-block
              relation)
-  (signal-declare (signal symbol symbol #'add-sig))
+  (signal-declare (signal symbol type #'add-sig))
+  (type (symbol [ int ] #'type-print)
+        (symbol #'identity))
   (module-declare (module symbol #'(lambda (x name) (setf *mod-name* name) (format t "~%entity ~A" name))))
   (direction in out)
 
   ;synchronous statements
   (sync (synchronous open symbol close #'start-sync))
   (sync-block (sync relation #'end-sync))
-  (port (symbol direction symbol #'add-port))
+  (port (symbol direction type #'add-port))
   (relation (symbol = rvalue #'add-relation))
-  (rvalue symbol)
+  (rvalue (hex #'hex-to-bin) symbol int)
   (ports (port) (ports port)))
 
 (defun print-vhdl ()
