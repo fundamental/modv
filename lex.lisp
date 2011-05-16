@@ -6,7 +6,7 @@
   (car token))
 
 (defparameter *lexer* 
-  (let ((stream (open "test.mod")))
+  (let ((stream (open "HexDisplay.mod")))
     (make-instance 'lexer-input-stream
                    :stream stream
                    :rules '(("module"      . module)
@@ -23,11 +23,12 @@
                             (":"           . :)
                             ("\\]"         . |]|)
                             ("\\["         . |[|)
-                            ("0x[0-9a-f]+" . hex)
-                            ("[a-z]+"      . symbol)
+                            ("0x[0-9a-fA-F]+" . hex)
+                            ("[a-zA-Z]+"   . symbol)
                             ("[0-9]*"      . int)
                             ("\\)"         . close)
                             ("\\("         . open)
+                            ("\"[0-9A-Za-z]+\"" . string)
                             ("[ \\n]"      . :whitespace)))))
 
 (defun next-tok ()

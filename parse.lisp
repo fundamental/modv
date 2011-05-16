@@ -43,7 +43,7 @@
 
 (define-parser *parser*
   (:start-symbol module-file)
-  (:terminals (module end out in : symbol end head arch signal = synchronous open close [ ] int hex lookup default))
+  (:terminals (module end out in : symbol end head arch signal = synchronous open close [ ] int hex lookup default string))
   (module-file (module-declare head : ports end arch : statements end))
   (statements (statements statement)
               statement)
@@ -69,7 +69,7 @@
                   (lookup-entries lookup-entry #'append))
   (port (symbol direction type #'add-port))
   (relation (symbol = rvalue #'add-relation))
-  (rvalue (hex #'hex-to-bin) symbol int)
+  (rvalue (hex #'hex-to-bin) symbol int string)
   (ports (port) (ports port)))
 
 (defun print-vhdl ()

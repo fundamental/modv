@@ -7,6 +7,8 @@
 (load :lex)
 (load :parse)
 
-(parse-with-lexer #'next-tok *parser*)
+(handler-case (parse-with-lexer #'next-tok *parser*)
+  (unmatched-lexing-sequence (e)
+                             (inspect e)))
 
 (print-vhdl)
