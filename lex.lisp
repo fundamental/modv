@@ -17,6 +17,8 @@
                             ("out"         . out)
                             ("in"          . in)
                             ("sync"        . synchronous)
+                            ("lookup"      . lookup)
+                            ("default"     . default)
                             ("="           . =)
                             (":"           . :)
                             ("\\]"         . |]|)

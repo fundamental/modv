@@ -29,17 +29,27 @@
   (format nil "~a(~a downto 0)" type (1- (parse-integer lim))))
 
 (defun hex-to-bin (hex)
-  (print hex)
   (format nil "X\"~X\"" (parse-integer (subseq hex 2) :radix 16)))
+
+(defun with-select (main selects x)
+  (push (format nil "~a ~%~{~a~^,~%~};" main selects) *relations*))
+
+(defun with-select-srt (result x x x input x x)
+  (format nil "with ~A select ~A <=" input result))
+
+(defun with-select-item (value x result)
+  (list (format nil "~A when ~A" result value)))
+
 
 (define-parser *parser*
   (:start-symbol module-file)
-  (:terminals (module end out in : symbol end head arch signal = synchronous open close [ ] int hex))
+  (:terminals (module end out in : symbol end head arch signal = synchronous open close [ ] int hex lookup default))
   (module-file (module-declare head : ports end arch : statements end))
   (statements (statements statement)
               statement)
   (statement signal-declare
              sync-block
+             lookup-block
              relation)
   (signal-declare (signal symbol type #'add-sig))
   (type (symbol [ int ] #'type-print)
@@ -50,6 +60,13 @@
   ;synchronous statements
   (sync (synchronous open symbol close #'start-sync))
   (sync-block (sync relation #'end-sync))
+  ;lookup statements
+  (lookup-start (symbol = lookup open symbol close : #'with-select-srt))
+  (lookup-block (lookup-start lookup-entries end #'with-select))
+  (lookup-entry (rvalue : rvalue #'with-select-item)
+                (default : rvalue))
+  (lookup-entries lookup-entry
+                  (lookup-entries lookup-entry #'append))
   (port (symbol direction type #'add-port))
   (relation (symbol = rvalue #'add-relation))
   (rvalue (hex #'hex-to-bin) symbol int)
