@@ -3,6 +3,8 @@
 #define YYSTYPE string
 #include <string>
 #include <sstream>
+#include <error.h>
+#include <errno.h>
 using namespace std;
 
 extern int yylineno;
@@ -11,8 +13,7 @@ bool insync = false;
 
 void yyerror(const char *str)
 {
-    fprintf(stderr, "ERROR: near line %d\n", yylineno);
-    fprintf(stderr, "ERROR: %s\n", str);
+    error(0,0,"near line %d: %s\n", yylineno, str);
 }
 
 int yywrap(void)
@@ -31,11 +32,27 @@ string gen_sym(void)
     return st.str();
 }
 
-int main()
+FILE *ofile = NULL;
+
+int main(int argc, char **argv)
 {
-    extern int yydebug;
+    if(argc!=3)
+        error(1,0,"usage:: %s in-file out-file", *argv);
+
+    extern FILE *yyin;
+    if(!(yyin=fopen(argv[1], "r")))
+        error(1, errno, "Failed to open input");
+
+    if(!(ofile=fopen(argv[2], "w+")))
+        error(1, errno, "Failed to open output");
+
+    //extern int yydebug;
     //yydebug=1;
     yyparse();
+
+    fclose(yyin);
+    fclose(ofile);
+    return 0;
 }
 
 string mod_name;
@@ -55,7 +72,7 @@ const char *fmt =
 void print_module(const char *use, const char *head,const char *arch)
 {
     const char *n = mod_name.c_str();
-    printf(fmt,n,head,n,n,arch);
+    fprintf(ofile, fmt, n, head, n, n, arch);
 }
 
 string compound(string cur, string next)
