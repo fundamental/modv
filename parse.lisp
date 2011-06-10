@@ -19,13 +19,13 @@
       (push rel *sync-relations*)
       (push rel *relations*))))
 
-(defun start-sync (x x name x)
+(defun start-sync (x y name z)
   (push (format nil "process(all)~%begin~%if(rising_edge(~A)) then" name) *relations*))
 
 (defun end-sync (&rest rest)
   (push (format nil "end if;~%end process;") *relations*))
 
-(defun type-print (type x lim x)
+(defun type-print (type x lim y)
   (format nil "~a(~a downto 0)" type (1- (parse-integer lim))))
 
 (defun hex-to-bin (hex)
@@ -34,7 +34,7 @@
 (defun with-select (main selects x)
   (push (format nil "~a ~%~{~a~^,~%~};" main selects) *relations*))
 
-(defun with-select-srt (result x x x input x x)
+(defun with-select-srt (result x y z input xx yy)
   (format nil "with ~A select ~A <=" input result))
 
 (defun with-select-item (value x result)
@@ -43,8 +43,8 @@
 
 (define-parser *parser*
   (:start-symbol module-file)
-  (:terminals (module end out in : symbol end head arch signal = synchronous open close [ ] int hex lookup default string))
-  (module-file (module-declare head : ports end arch : statements end))
+  (:terminals (module end out in |:| symbol end head arch signal = synchronous open close [ ] int hex lookup default string))
+  (module-file (module-declare head |:| ports end arch |:| statements end))
   (statements (statements statement)
               statement)
   (statement signal-declare
@@ -61,10 +61,10 @@
   (sync (synchronous open symbol close #'start-sync))
   (sync-block (sync relation #'end-sync))
   ;lookup statements
-  (lookup-start (symbol = lookup open symbol close : #'with-select-srt))
+  (lookup-start (symbol = lookup open symbol close |:| #'with-select-srt))
   (lookup-block (lookup-start lookup-entries end #'with-select))
-  (lookup-entry (rvalue : rvalue #'with-select-item)
-                (default : rvalue))
+  (lookup-entry (rvalue |:| rvalue #'with-select-item)
+                (default |:| rvalue))
   (lookup-entries lookup-entry
                   (lookup-entries lookup-entry #'append))
   (port (symbol direction type #'add-port))

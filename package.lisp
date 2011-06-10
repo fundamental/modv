@@ -1,14 +1,16 @@
-(ql:quickload :graylex)
-(ql:quickload :yacc)
+(require :asdf)
+(require :graylex)
+(require :yacc)
 (defpackage #:modv-compiler
   (:use #:cl #:yacc #:graylex))
 (in-package #:modv-compiler)
 
-(load :lex)
-(load :parse)
+(load "lex.lisp")
+(load "parse.lisp")
 
-(handler-case (parse-with-lexer #'next-tok *parser*)
-  (unmatched-lexing-sequence (e)
-                             (inspect e)))
+(defun main (argv)
+  (handler-case (parse-with-lexer #'next-tok *parser*)
+    (unmatched-lexing-sequence (e)
+                               (inspect e)))
 
-(print-vhdl)
+  (print-vhdl))
