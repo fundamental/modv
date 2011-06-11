@@ -32,6 +32,14 @@ string gen_sym(void)
     return st.str();
 }
 
+string dec(string str)
+{
+    stringstream st;
+    st << atoi(str.c_str())-1;
+    return st.str();
+}
+
+
 FILE *ofile = NULL;
 
 int main(int argc, char **argv)
@@ -60,25 +68,27 @@ const char *fmt =
 "library ieee;\n"\
 "use ieee.std_logic_1164.all;\n"\
 "use work.all;\n"\
+"use modv.all;\n"\
+"%s"\
 "\n"\
 "entity %s is\n"\
 "%s\n"\
 "end %s;\n"\
 "\n"\
-"architecture default of %s\n"\
+"architecture default of %s is\n"\
 "%s\n"\
 "end architecture;\n";
 
 void print_module(const char *use, const char *head,const char *arch)
 {
     const char *n = mod_name.c_str();
-    fprintf(ofile, fmt, n, head, n, n, arch);
+    fprintf(ofile, fmt, use, n, head, n, n, arch);
 }
 
 string compound(string cur, string next)
 {
     if(next[0]=='^')
-        return next.substr(1) + cur;
+        return cur.insert(cur.find("begin"),next.substr(1));
     return cur + next;
 }
 
@@ -100,7 +110,7 @@ string make_port(string slist, string dir, string type)
         direction = " inout ";
     else
         direction = " ";
-    return dir + slist + direction + type + "@";
+    return dir + slist + ':' + direction + type + "@";
 }
 
 string get_port(string &plist)
@@ -129,7 +139,10 @@ string format_ports(string plist)
         generics.erase(generics.length()-2);
     if(!ports.empty())
         ports.erase(ports.length()-2);
-    return "port(" + ports + ");\ngeneric(" + generics + ");";
+    string result = "port(" + ports + ");\n";
+    if(!generics.empty())
+        result = "generic(" + generics + ");\n" + result;
+    return result;
 }
 
 
@@ -192,10 +205,10 @@ ports: port
      | ports port {$$=$1+$2;}
      ;
 type: SYMBOL
-    | SYMBOL '[' literal ']' {$$=$1 + "(" + $3 + " downto 0)"}
+    | SYMBOL '[' literal ']' {$$=$1 + "(" + dec($3) + " downto 0)"}
     | SYMBOL '[' range ']' {$$=$1 + "(" + $3 + ")"}
     ;
-range: INT '.' '.' INT {$$ = $1 + " downto " + $4;}
+range: INT '.' '.' INT {$$ = dec($1) + " downto " + $4;}
      ;
 arch_desc: ARCH ':' statements END {$$=$3;}
          ;
@@ -266,7 +279,7 @@ signal_block: SIGNAL sdeclare {$$ = "^" + $2;}
             | SIGNAL ':' sdeclares END {$$ = "^" + $3;}
             ;
 
-sdeclare: slist type {$$ = "signal " + $1 + " " + $2 + ";\n";}
+sdeclare: slist type {$$ = "signal " + $1 + ":" + $2 + ";\n";}
         ;
 sdeclares: sdeclare
          | sdeclares sdeclare
@@ -288,7 +301,7 @@ expr: literal
     | expr AND expr {$$ = $1 + " " + $2 + " " + $3;}
     | expr OR expr {$$ = $1 + " " + $2 + " " + $3;}
     | expr XOR expr {$$ = $1 + " " + $2 + " " + $3;}
-    | expr EQEQ expr {$$ = $1 + " == " + $3;}
+    | expr EQEQ expr {$$ = $1 + " = " + $3;}
     | expr NEQ expr {$$ = $1 + " /= " + $3;}
     | expr '&' expr {$$ = $1 + " & " + $3;}
     | expr '<' expr {$$ = $1 + " < " + $3;}
@@ -309,7 +322,7 @@ others_exp: '*' CHAR {$$ = "(others => " + $2 + ")"}
 
 type_declare: enum_declare
             ;
-enum_declare: ENUM SYMBOL '(' slist ')' {$$= "type " + $2 + "is (" + $4 + ");\n";}
+enum_declare: ENUM SYMBOL '(' slist ')' {$$= "^type " + $2 + " is (" + $4 + ");\n";}
             ;
 
 module_block: mod_ref mod_conn {$$ = $1 + " " + $2 + ";\n"}
