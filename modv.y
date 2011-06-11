@@ -148,13 +148,25 @@ string format_ports(string plist)
 
 string make_sync(string clk, string extra="")
 {
-    string ret("process(all)\nbegin\nif(rising_edge("+clk+")");
+    string ret("if(rising_edge("+clk+")");
     
     if(extra.empty())
         return ret + ") then\n";
     return ret + "and " + extra + ") then\n";
 }
-
+string make_syncfull(string init, string stmts)
+{
+    string ret("process(all)\nbegin\n");
+    int low;
+    if((low = stmts.find('@'))!=string::npos) { //handle async statements
+        int high = stmts.find('@',low+1);   
+        ret += stmts.substr(low+1,high-1); 
+        stmts.erase(low,high-low+2);
+    }
+        
+    ret += init + stmts + "end if;\nend process;\n";
+    return ret;
+}
 string make_ternary(string var, string cond, string t_case, string f_case)
 {
     if(insync)
@@ -164,10 +176,15 @@ string make_ternary(string var, string cond, string t_case, string f_case)
         return var + "<= " + t_case + " when " + cond + " else " + f_case + ";\n";
 }
 
+string make_async(string stmts)
+{
+    return "@" + stmts + "@";
+}
+
 %}
 
 %token MODULE ARCH SIGNAL HEAD END OUT IN SYNC LOOKUP DEFAULT SYMBOL STRING INT
-%token INOUT HEX BUF ENUM PORT GENERIC CHAR CASE IF ELSE USE
+%token INOUT HEX BUF ENUM PORT GENERIC CHAR CASE IF ELSE USE ASYNC
 
 %left AND
 %left OR
@@ -227,6 +244,7 @@ statements: {$$ = "begin\n";}
 sync_statement: relation
               | if_block
               | case_block
+              | async_block
               ;
 sync_statements: sync_statement
                | sync_statements sync_statement {$$ = $1 + '\n' + $2;}
@@ -254,9 +272,11 @@ cases: case
 sync_srt: SYNC '(' SYMBOL ')' {insync = true; $$ = make_sync($3);}
         | SYNC '(' SYMBOL ',' expr ')' {insync=true;$$ = make_sync($3, $5);}
         ;
-sync_block: sync_srt ':' sync_statements END {insync = false;$$ = $1 + $3 + "end if;\nend process;\n"}
-          | sync_srt sync_statement {insync = false;$$ = $1 + $2 + "end if;\nend process;\n"}
+sync_block: sync_srt ':' sync_statements END {insync=0;$$ = make_syncfull($1, $3);}
+          | sync_srt sync_statement {insync=0;$$ = make_syncfull($1,$2);}
           ;
+async_block: ASYNC ':' sync_statements END {$$ = make_async($3);}
+           | ASYNC sync_statement {$$ = make_async($2);}
 lookup_block: lvalue '=' LOOKUP '(' expr ')' ':' lookup_entries END
             {$$ = "with " + $5 + " select " + $1 + " <=\n" + $8 + ";\n";}
             ;

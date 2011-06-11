@@ -11,6 +11,7 @@ using namespace std;
 %%
 use return USE;
 enum return ENUM;
+async return ASYNC;
 module return MODULE;
 arch return ARCH;
 signal yylval=yytext;return SIGNAL;
