@@ -13,7 +13,7 @@ bool insync = false;
 
 void yyerror(const char *str)
 {
-    error(0,0,"near line %d: %s\n", yylineno, str);
+    error(1,0,"near line %d: %s\n", yylineno, str);
 }
 
 int yywrap(void)
@@ -300,6 +300,7 @@ signal_block: SIGNAL sdeclare {$$ = "^" + $2;}
             ;
 
 sdeclare: slist type {$$ = "signal " + $1 + ":" + $2 + ";\n";}
+        | slist type init {$$ = "signal " + $1 + ":" + $2 + $3 + ";\n";}
         ;
 sdeclares: sdeclare
          | sdeclares sdeclare
