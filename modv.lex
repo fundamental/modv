@@ -55,7 +55,6 @@ xor         return XOR;
 \?          return '?';
 \(          return '(';
 \)          return ')';
-\.          return '.';
 
 0x[[:xdigit:]]+  {yylval = std::string("X\"") + (yytext + 2) + "\"";
                   return HEX;} //Values

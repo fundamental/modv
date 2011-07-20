@@ -227,7 +227,7 @@ type: SYMBOL
     | SYMBOL '[' literal ']' {$$=$1 + "(" + dec($3) + " downto 0)"}
     | SYMBOL '[' range ']' {$$=$1 + "(" + $3 + ")"}
     ;
-range: INT '.' '.' INT {$$ = dec($1) + " downto " + $4;}
+range: INT ':' INT {$$ = dec($1) + " downto " + $3;}
      ;
 arch_desc: ARCH ':' statements END {$$=$3;}
          ;

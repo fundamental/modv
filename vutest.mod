@@ -14,8 +14,8 @@ arch:
     signal sysTick log
 
     
-    ledg[7..0] = output[7..0]
-    ledr[7..0] = output[15..8]
+    ledg[7:0] = output[7:0]
+    ledr[7:0] = output[15:8]
 
     output = lookup(input):
         0x0: "000000000000000"
