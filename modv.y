@@ -3,6 +3,8 @@
 #define YYSTYPE string
 #include <string>
 #include <sstream>
+#include <cstdio>
+#include <cstdlib>
 #include <error.h>
 #include <errno.h>
 using namespace std;
@@ -319,16 +321,16 @@ expr: literal
     | others_exp
     | SYMBOL '(' explist ')' {$$ = $1 + "(" + $3 + ")";}
     | '(' expr ')' {$$ = "(" + $2 + ")";}
-    | expr AND expr {$$ = $1 + " " + $2 + " " + $3;}
-    | expr OR expr {$$ = $1 + " " + $2 + " " + $3;}
-    | expr XOR expr {$$ = $1 + " " + $2 + " " + $3;}
-    | expr EQEQ expr {$$ = $1 + " = " + $3;}
-    | expr NEQ expr {$$ = $1 + " /= " + $3;}
-    | expr '&' expr {$$ = $1 + " & " + $3;}
-    | expr '<' expr {$$ = $1 + " < " + $3;}
-    | expr '>' expr {$$ = $1 + " > " + $3;}
-    | expr '+' expr {$$ = $1 + " + " + $3;}
-    | expr '-' expr {$$ = $1 + " - " + $3;}
+    | expr AND expr  {$$ = $1 + " and " + $3;}
+    | expr OR expr   {$$ = $1 + " or "  + $3;}
+    | expr XOR expr  {$$ = $1 + " xor " + $3;}
+    | expr EQEQ expr {$$ = $1 + " = "   + $3;}
+    | expr NEQ expr  {$$ = $1 + " /= "  + $3;}
+    | expr '&' expr  {$$ = $1 + " & "   + $3;}
+    | expr '<' expr  {$$ = $1 + " < "   + $3;}
+    | expr '>' expr  {$$ = $1 + " > "   + $3;}
+    | expr '+' expr  {$$ = $1 + " + "   + $3;}
+    | expr '-' expr  {$$ = $1 + " - "   + $3;}
     | NOT expr {$$ = $1 + " " + $2;}
     | error {yyerror("Unhandled expression");}
     ;
