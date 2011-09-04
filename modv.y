@@ -10,6 +10,7 @@
 #include "codegen.cpp"
 using std::string;
 using std::stringstream;
+using namespace CodeGen;
 
 extern int yylineno;
 
@@ -67,11 +68,9 @@ int main(int argc, char **argv)
     return 0;
 }
 
-string mod_name;
-
 void print_module(const char *use, const char *head,const char *arch)
 {
-    codeGen::module(use, head, arch);
+    module(use, head, arch);
 }
 
 string compound(string cur, string next)
@@ -101,7 +100,10 @@ string make_port(string slist, string dir, string type)
         direction = " buffer ";
     else
         direction = " ";
-    return dir + slist + ':' + direction + type + "@";
+
+    Symbol _name(slist);
+    Symbol _type(type);
+    return " " + Port(direction.c_str(), &_name, &_type).code_string() + "@";
 }
 
 string get_port(string &plist)
@@ -196,7 +198,7 @@ uses: {$$=""}
 use: USE SYMBOL {$$=make_use($2);}
    ;
 
-mod_declare: MODULE SYMBOL {mod_name=$2;}
+mod_declare: MODULE SYMBOL {context.modname=new Symbol($2);}
            ;
 head_declare: HEAD ':' ports END {$$ = format_ports($3);}
             ;
