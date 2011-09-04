@@ -16,3 +16,6 @@ add_executable(modv-comp
     ${BISON_Parser_OUTPUTS}
     ${FLEX_Scanner_OUTPUTS}
 )
+
+enable_testing()
+add_subdirectory(tests)

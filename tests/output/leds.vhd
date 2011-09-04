@@ -13,7 +13,7 @@ architecture default of leds is
 begin
 process(all)
 begin
-if(rising_edge(cpu.clk)and cpu.addr = X"01" and X"01" cpu.rw) then
+if(rising_edge(cpu.clk)and cpu.addr = X"01" and not cpu.rw) then
 leds<=cpu.data;
 end if;
 end process;
