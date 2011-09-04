@@ -7,7 +7,9 @@
 #include <cstdlib>
 #include <error.h>
 #include <errno.h>
-using namespace std;
+#include "codegen.cpp"
+using std::string;
+using std::stringstream;
 
 extern int yylineno;
 
@@ -66,25 +68,10 @@ int main(int argc, char **argv)
 }
 
 string mod_name;
-const char *fmt = 
-"library ieee;\n"\
-"use ieee.std_logic_1164.all;\n"\
-"use work.all;\n"\
-"use modv.all;\n"\
-"%s"\
-"\n"\
-"entity %s is\n"\
-"%s\n"\
-"end %s;\n"\
-"\n"\
-"architecture default of %s is\n"\
-"%s\n"\
-"end architecture;\n";
 
 void print_module(const char *use, const char *head,const char *arch)
 {
-    const char *n = mod_name.c_str();
-    fprintf(ofile, fmt, use, n, head, n, n, arch);
+    codeGen::module(use, head, arch);
 }
 
 string compound(string cur, string next)
@@ -110,6 +97,8 @@ string make_port(string slist, string dir, string type)
         direction = " out ";
     else if(dir=="x")
         direction = " inout ";
+    else if(dir=="b")
+        direction = " buffer ";
     else
         direction = " ";
     return dir + slist + ':' + direction + type + "@";
@@ -331,7 +320,7 @@ expr: literal
     | expr '>' expr  {$$ = $1 + " > "   + $3;}
     | expr '+' expr  {$$ = $1 + " + "   + $3;}
     | expr '-' expr  {$$ = $1 + " - "   + $3;}
-    | NOT expr {$$ = $1 + " " + $2;}
+    | NOT expr {$$ = " not " + $2;}
     | error {yyerror("Unhandled expression");}
     ;
 
