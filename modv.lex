@@ -2,7 +2,7 @@
 #define YYSTYPE std::string
 #include <string>
 #include <err.h>
-#include "modv.tab.h"
+#include "parse.hpp"
 
 using namespace std;
 
