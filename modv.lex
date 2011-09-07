@@ -1,7 +1,9 @@
 %{
-#define YYSTYPE std::string
 #include <string>
 #include <err.h>
+#include <codegen.h>
+using CodeGen::Vlist;
+using CodeGen::Symbol;
 #include "parse.hpp"
 
 using namespace std;
@@ -56,12 +58,12 @@ xor         return XOR;
 \(          return '(';
 \)          return ')';
 
-0x[[:xdigit:]]+  {yylval = std::string("X\"") + (yytext + 2) + "\"";
+0x[[:xdigit:]]+  {yylval.sym = new Symbol(std::string("X\"") + (yytext + 2) + "\"");
                   return HEX;} //Values
-[[:digit:]]+      yylval = yytext; return INT;
-\"[[:alnum:]]*\"  yylval = yytext; return STRING;
-\'[[:alnum:]]\'   yylval = yytext; return CHAR;
-[[:alpha:]][[:alnum:]_\.]* yylval = yytext; return SYMBOL;
+[[:digit:]]+      yylval.num = atoi(yytext); return INT;
+\"[[:alnum:]]*\"  yylval.sym = new Symbol(yytext); return STRING;
+\'[[:alnum:]]\'   yylval.sym = new Symbol(yytext); return CHAR;
+[[:alpha:]][[:alnum:]_\.]* yylval.sym = new Symbol(yytext); return SYMBOL;
 
 
 --[^\n]*       //ignored

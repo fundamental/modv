@@ -1,12 +1,13 @@
 %{
-
-#define YYSTYPE string
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <cstdio>
 #include <cstdlib>
 #include <error.h>
+#include <err.h>
 #include <errno.h>
+extern std::ofstream ofile;
 #include "codegen.cpp"
 using std::string;
 using std::stringstream;
@@ -44,9 +45,14 @@ string dec(string str)
     return st.str();
 }
 
+Symbol _IN("in"),
+       _OUT("out"),
+       _INOUT("inout"),
+       _BUF("buffer"),
+       _GENERIC("generic");
 
-FILE *ofile = NULL;
 
+std::ofstream ofile;
 int main(int argc, char **argv)
 {
     if(argc!=3)
@@ -56,7 +62,8 @@ int main(int argc, char **argv)
     if(!(yyin=fopen(argv[1], "r")))
         error(1, errno, "Failed to open input");
 
-    if(!(ofile=fopen(argv[2], "w+")))
+    ofile.open(argv[2]);
+    if(!ofile.good())
         error(1, errno, "Failed to open output");
 
     //extern int yydebug;
@@ -64,13 +71,8 @@ int main(int argc, char **argv)
     yyparse();
 
     fclose(yyin);
-    fclose(ofile);
+    ofile.close();
     return 0;
-}
-
-void print_module(const char *use, const char *head,const char *arch)
-{
-    module(use, head, arch);
 }
 
 string compound(string cur, string next)
@@ -80,30 +82,12 @@ string compound(string cur, string next)
     return cur + next;
 }
 
-string make_use(string use_name)
+Symbol *make_use(Symbol *sym)
 {
-    if(use_name == "unsigned")
-        use_name = "ieee.std_logic_unsigned";
-    return "use " + use_name + ".all;\n";
-}
-
-string make_port(string slist, string dir, string type)
-{
-    string direction;
-    if(dir=="i")
-        direction = " in ";
-    else if(dir=="o")
-        direction = " out ";
-    else if(dir=="x")
-        direction = " inout ";
-    else if(dir=="b")
-        direction = " buffer ";
-    else
-        direction = " ";
-
-    Symbol _name(slist);
-    Symbol _type(type);
-    return " " + Port(direction.c_str(), &_name, &_type).code_string() + "@";
+    if(sym->name == "unsigned")
+        sym->name = "ieee.std_logic_unsigned";
+    sym->name = "use " + sym->name + ".all;\n";
+    return sym;
 }
 
 string get_port(string &plist)
@@ -142,7 +126,7 @@ string format_ports(string plist)
 string make_sync(string clk, string extra="")
 {
     string ret("if(rising_edge("+clk+")");
-    
+
     if(extra.empty())
         return ret + ") then\n";
     return ret + "and " + extra + ") then\n";
@@ -152,11 +136,11 @@ string make_syncfull(string init, string stmts)
     string ret("process(all)\nbegin\n");
     int low;
     if((low = stmts.find('@'))!=string::npos) { //handle async statements
-        int high = stmts.find('@',low+1);   
-        ret += stmts.substr(low+1,high-1); 
+        int high = stmts.find('@',low+1);
+        ret += stmts.substr(low+1,high-1);
         stmts.erase(low,high-low+2);
     }
-        
+
     ret += init + stmts + "end if;\nend process;\n";
     return ret;
 }
@@ -169,187 +153,266 @@ string make_ternary(string var, string cond, string t_case, string f_case)
         return var + "<= " + t_case + " when " + cond + " else " + f_case + ";\n";
 }
 
-string make_async(string stmts)
+//TODO FIXME
+Vlist *make_async(Vlist *vstmts)
 {
-    return "@" + stmts + "@";
+    return vstmts;
 }
 
+Vlist *make_signals(Vlist *names, Type *t)
+{
+    Vlist *list = new Vlist();
+    for(auto itr = names->begin(); itr != names->end(); ++itr) {
+        Symbol *sym = dynamic_cast<Symbol*>(*itr);
+        assert(sym);
+        list->push_back(new Signal(sym, t));
+    }
+    return list;
+}
+
+Vlist *make_ports(Vlist *names, Symbol *dir, Type *t)
+{
+    Vlist *list = new Vlist();
+    for(auto itr = names->begin(); itr != names->end(); ++itr) {
+        Symbol *name = dynamic_cast<Symbol*>(*itr);
+        assert(name);
+        list->push_back(new Port(dir, name, t));
+    }
+    return list;
+}
 %}
+
+%union
+{
+    int     num;
+    char    chr;
+    char   *string;
+    struct Expr   *expr;
+    struct Port   *port;
+    struct Arch   *arch;
+    struct Sync   *sync;
+    struct Cond   *cond;
+    struct Case   *cse;
+    struct Type   *type;
+    struct Range  *range;
+           Vlist  *vlst;
+    struct Value  *val;
+    struct ModDef *header;
+    struct Symbol *sym;
+    struct Signal *sig;
+    struct Lvalue *lval;
+
+    struct Lookup  *lup;
+
+    struct Ternary *ternary;
+
+    struct SubModule *mref;
+    struct CaseBlock *cblock;
+
+
+    struct SimpleRelation *srelation;
+}
 
 %token MODULE ARCH SIGNAL HEAD END OUT IN SYNC LOOKUP DEFAULT SYMBOL STRING INT
 %token INOUT HEX BUF ENUM PORT GENERIC CHAR CASE IF ELSE USE ASYNC
 
+%type<num>          INT
+%type<chr>          CHAR
+%type<sym>          direction SYMBOL DEFAULT
+%type<cse>          case
+%type<lup>          lookup_block
+%type<sym>          use
+%type<type>         type
+%type<val>          literal sync_statement type_declare mod_conn
+%type<val>          lookup_entry module_block simple_relation case_stmt
+%type<vlst>         slist ports statements sync_statements sdeclares cases
+%type<vlst>         lookup_entries explist mod_conns signal_block
+%type<vlst>         async_block sdeclare 
+%type<vlst>         port statement
+%type<lval>         lvalue
+%type<mref>         mod_ref
+%type<expr>         expr others_expr
+%type<arch>         arch_desc
+%type<sync>         sync_block sync_srt
+%type<cond>         if_block
+%type<range>        range
+%type<string>       enum_declare
+%type<header>       head_declare
+%type<ternary>      ternary
+
 %left AND
 %left OR
 %left EQEQ
-%left NEQ 
+%left NEQ
 %left XOR
 %left '&' '<' '>' '+' '-'
 %left ELSE
 %nonassoc NOT
 
 %%
-module: mod_declare uses head_declare arch_desc 
-      {print_module($2.c_str(),$3.c_str(),$4.c_str());}
+module: mod_declare uses head_declare arch_desc
+      {module(context, *$3, *$4);}
       ;
-uses: {$$=""}
-    | uses use {$$=$1+$2;}
+uses:
+    | uses use {context.add_use($2);}
     ;
 use: USE SYMBOL {$$=make_use($2);}
    ;
 
-mod_declare: MODULE SYMBOL {context.modname=new Symbol($2);}
+mod_declare: MODULE SYMBOL {context.modname = $2;}
            ;
-head_declare: HEAD ':' ports END {$$ = format_ports($3);}
+head_declare: HEAD ':' ports END {$$ = new ModDef(); $$->in << $3;}
             ;
-port: slist direction type {$$ = make_port($1,$2,$3);}
-    | slist direction type init {$$ = make_port($1,$2,$3+$4);}
-    | slist error type {$$="";yyerror("bad direction\n");}
+port: slist direction type {$$ = make_ports($1, $2, $3)}
+    | slist direction type '(' literal ')'{$$ = NULL;/*new Port($2, toSym(*$1), $3);neglects init*/}
+    | slist error type {yyerror("bad direction\n");}
     ;
-init: '(' literal ')' {$$ = " := " + $2;}
+slist: SYMBOL {$$=new Vlist; $$->push_back($1)}
+     | slist ',' SYMBOL {$$ = $1; $1->push_back($3);}
+     ;
+ports: port {$$=$1;}
+     | ports port {append(($$=$1), $2);}
+     ;
+type: SYMBOL {$$=new ScalarType($1)}
+    | SYMBOL '[' INT ']' {$$=new VectorType($1, new Range($3));}
+    | SYMBOL '[' range ']' {$$=new VectorType($1, $3);}
     ;
-slist: SYMBOL
-     | slist ',' SYMBOL {$$ = $1 + ", " + $3;}
+range: INT ':' INT {$$ = new Range($1, $3);}
      ;
-ports: port
-     | ports port {$$=$1+$2;}
-     ;
-type: SYMBOL
-    | SYMBOL '[' literal ']' {$$=$1 + "(" + dec($3) + " downto 0)"}
-    | SYMBOL '[' range ']' {$$=$1 + "(" + $3 + ")"}
-    ;
-range: INT ':' INT {$$ = dec($1) + " downto " + $3;}
-     ;
-arch_desc: ARCH ':' statements END {$$=$3;}
+arch_desc: ARCH ':' statements END {$$=new Arch(); $$->add($3);}
          ;
 statement: signal_block
-         | sync_block
-         | lookup_block
-         | relation
-         | type_declare
-         | module_block
-         | error {printf("bad statement[%s](%d)\n",$1.c_str(),yylineno);}
+         | sync_block      {$$=new Vlist(); $$->push_back($1);}
+         | lookup_block    {$$=new Vlist(); $$->push_back($1);}
+         | simple_relation {$$=new Vlist(); $$->push_back($1);}
+         | ternary         {$$=new Vlist(); $$->push_back($1);}
+         | type_declare    {$$=new Vlist(); $$->push_back($1);}
+         | module_block    {$$=new Vlist(); $$->push_back($1);}
+         | error {$$=NULL;errx(1,"bad statement on %d\n",yylineno);}
          ;
-statements: {$$ = "begin\n";}
-          | statements statement {$$=compound($1,$2);}
+statements: {$$=new Vlist();}
+          | statements statement {append($$=$1, $2);}
           ;
 
-sync_statement: relation
-              | if_block
-              | case_block
+sync_statement: simple_relation
+              | if_block {$$=static_cast<Value*>($1);}
+              | case
               | async_block
               ;
-sync_statements: sync_statement
-               | sync_statements sync_statement {$$ = $1 + '\n' + $2;}
+sync_statements: sync_statement {($$=new Vlist())->push_back($1)}
+               | sync_statements sync_statement {$$=$1; $1->push_back($2);}
                ;
-if_block: IF '(' expr ')' sync_statement opt_else{$$ = "if (" + $3 + ") then\n"
-        + $5 + $6 + "end if;\n";}
-        | IF '(' expr ')' ':' sync_statements opt_else END{$$ = "if (" + $3 + ") then\n"
-        + $6 + $7 + "end if;\n";}
+if_block: IF '(' expr ')' sync_statement ELSE sync_statement
+        {$$ = new Cond($3);
+         $$->when << $5; $$->unless << $7;}
+        | IF '(' expr ')' ':' sync_statements ELSE ':' sync_statements END
+        {$$ = new Cond($3);
+         $$->when << $6; $$->unless << $9;}
+        | IF '(' expr ')' sync_statement
+        {$$ = new Cond($3); $$->when << $5;}
+        | IF '(' expr ')' ':' sync_statements END
+        {$$ = new Cond($3); $$->when << $6;}
         ;
-opt_else: {$$ = "";}
-        | ELSE sync_statement {$$ = "else\n" + $2 + "\n";}
-        | ELSE ':' sync_statements {$$ = "else\n" + $3 + "\n";}
-        ;
-case_srt: CASE '(' expr ')' {$$ = "case (" + $3 + ") is \n";}
-        ;
-case_block: case_srt ':' cases END {$$ = $1 + $3 + "end case;\n";}
+case: CASE '(' expr ')' ':' cases END {($$=new Case($3))->buildCases($6);}
           ;
-case: SYMBOL ':' {$$ = "when " + $1 + " =>";}
-    | DEFAULT ':' {$$ = "when others =>";}
-    | sync_statement
-    ;
-cases: case
-     | cases case {$$ = $1 + '\n' + $2;}
+cases: case_stmt {($$=new Vlist())->push_back($1);}
+     | cases case_stmt {($$=$1)->push_back($2);}
      ;
-sync_srt: SYNC '(' SYMBOL ')' {insync = true; $$ = make_sync($3);}
-        | SYNC '(' SYMBOL ',' expr ')' {insync=true;$$ = make_sync($3, $5);}
+case_stmt: SYMBOL  ':'    {$$=new CaseLabel($1);}
+         | DEFAULT ':'    {$$=new CaseLabel($1);}
+         | sync_statement
+         ;
+
+sync_srt: SYNC '(' SYMBOL ')' {$$ = new Sync($3);}
+        | SYNC '(' SYMBOL ',' expr ')' {$$ = new Sync($3, $5);}
         ;
-sync_block: sync_srt ':' sync_statements END {insync=0;$$ = make_syncfull($1, $3);}
-          | sync_srt sync_statement {insync=0;$$ = make_syncfull($1,$2);}
+sync_block: sync_srt ':' sync_statements END {($$=$1)->cond->when << $3;}
+          | sync_srt sync_statement          {($$=$1)->cond->when << $2;}
           ;
 async_block: ASYNC ':' sync_statements END {$$ = make_async($3);}
-           | ASYNC sync_statement {$$ = make_async($2);}
+           | ASYNC sync_statement {Vlist v; v << $2;$$ = make_async(&v);}
 lookup_block: lvalue '=' LOOKUP '(' expr ')' ':' lookup_entries END
-            {$$ = "with " + $5 + " select " + $1 + " <=\n" + $8 + ";\n";}
+            {$$ = new Lookup($1, $5); $$->entries << $8;/*ignores entries*/;}
             ;
-lookup_entries: lookup_entry
-              | lookup_entries lookup_entry {$$ = $1+",\n"+$2;}
+lookup_entries: lookup_entry {($$=new Vlist())->push_back($1)}
+              | lookup_entries lookup_entry {($$=$1)->push_back($2);}
               ;
-lookup_entry: literal ':' expr {$$ = $3 + " when " + $1;}
-            | DEFAULT ':' expr {$$ = $3 + " when others";}
+lookup_entry: literal ':' expr {$$ = new LookupPair($1,$3);}
+            | DEFAULT ':' expr {$$ = new LookupPair($3);}
             ;
-literal: INT 
+literal: INT {$$=new Int($1);}
        | STRING
        | HEX
        | CHAR
        | SYMBOL
-       | SYMBOL '[' expr ']' {$$ = $1 + "(" + $3 + ")";}
-       | SYMBOL '[' range ']' {$$ = $1 + "(" + $3 + ")";} 
+       | SYMBOL '[' expr ']'  {$$ = new RangedLvalue($1, $3);}
+       | SYMBOL '[' range ']' {$$ = new RangedLvalue($1, $3);}
        ;
 
-signal_block: SIGNAL sdeclare {$$ = "^" + $2;}
-            | SIGNAL ':' sdeclares END {$$ = "^" + $3;}
+signal_block: SIGNAL sdeclare {$$ = $2;}
+            | SIGNAL ':' sdeclares END {$$ = $3;}
             ;
 
-sdeclare: slist type {$$ = "signal " + $1 + ":" + $2 + ";\n";}
-        | slist type init {$$ = "signal " + $1 + ":" + $2 + $3 + ";\n";}
+sdeclare: slist type {$$ = make_signals($1, $2);}
+        | slist type '(' literal ')' {$$ = make_signals($1, $2)/*ignores init*/;}
         ;
 sdeclares: sdeclare
          | sdeclares sdeclare
          ;
 
-direction: IN       {$$ = "i";}
-         | OUT      {$$ = "o";}
-         | INOUT    {$$ = "x";}
-         | BUF      {$$ = "b";}
-         | GENERIC  {$$ = "g";}
+direction: IN       {$$ = &_IN;}
+         | OUT      {$$ = &_OUT;}
+         | INOUT    {$$ = &_INOUT;}
+         | BUF      {$$ = &_BUF;}
+         | GENERIC  {$$ = &_GENERIC;}
          ;
-relation: lvalue '=' expr  {$$ = $1 + "<=" + $3 + ";\n";}
-        | lvalue '=' expr '?' expr ':' expr {$$ = make_ternary($1,$3,$5,$7);}
-        ;
+simple_relation: lvalue '=' expr  {$$ = new SimpleRelation($1, $3);}
+               ;
+ternary: lvalue '=' expr '?' expr ':' expr {$$ = new Ternary($1,$3,$5,$7);}
+       ;
 expr: literal
-    | others_exp
-    | SYMBOL '(' explist ')' {$$ = $1 + "(" + $3 + ")";}
-    | '(' expr ')' {$$ = "(" + $2 + ")";}
-    | expr AND expr  {$$ = $1 + " and " + $3;}
-    | expr OR expr   {$$ = $1 + " or "  + $3;}
-    | expr XOR expr  {$$ = $1 + " xor " + $3;}
-    | expr EQEQ expr {$$ = $1 + " = "   + $3;}
-    | expr NEQ expr  {$$ = $1 + " /= "  + $3;}
-    | expr '&' expr  {$$ = $1 + " & "   + $3;}
-    | expr '<' expr  {$$ = $1 + " < "   + $3;}
-    | expr '>' expr  {$$ = $1 + " > "   + $3;}
-    | expr '+' expr  {$$ = $1 + " + "   + $3;}
-    | expr '-' expr  {$$ = $1 + " - "   + $3;}
-    | NOT expr {$$ = " not " + $2;}
+    | others_expr
+    | SYMBOL '(' explist ')' {$$ = new Function($1, NULL)/*$1 + "(" + $3 + ")"*/;}
+    | '(' expr ')' {$$ = NULL;/*"(" + $2 + ")"*/;}
+    | expr AND expr  {$$ = new Op2("and", $1, $3);}
+    | expr OR expr   {$$ = new Op2("or",  $1, $3);}
+    | expr XOR expr  {$$ = new Op2("xor", $1, $3);}
+    | expr EQEQ expr {$$ = new Op2("=" ,  $1, $3);}
+    | expr NEQ expr  {$$ = new Op2("/=",  $1, $3);}
+    | expr '&' expr  {$$ = new Op2("&" ,  $1, $3);}
+    | expr '<' expr  {$$ = new Op2("<" ,  $1, $3);}
+    | expr '>' expr  {$$ = new Op2(">" ,  $1, $3);}
+    | expr '+' expr  {$$ = new Op2("+" ,  $1, $3);}
+    | expr '-' expr  {$$ = new Op2("-" ,  $1, $3);}
+    | NOT expr {$$ = new Op1("not", $2);}
     | error {yyerror("Unhandled expression");}
     ;
 
-lvalue: SYMBOL '[' expr ']' {$$ = $1 + "(" + $3 + ")";}
-      | SYMBOL '[' range ']' {$$ = $1 + "(" + $3 + ")";} 
-      | SYMBOL
+lvalue: SYMBOL '[' expr ']'  {$$ = new RangedLvalue($1, $3);}
+      | SYMBOL '[' range ']' {$$ = new RangedLvalue($1, $3);}
+      | SYMBOL {$$=new SimpleLvalue($1);}
       ;
 
-others_exp: '*' CHAR {$$ = "(others => " + $2 + ")"}
-          ;
+others_expr: '*' CHAR {$$ = new Others(new Symbol($2));}
+           ;
 
 type_declare: enum_declare
             ;
-enum_declare: ENUM SYMBOL '(' slist ')' {$$= "^type " + $2 + " is (" + $4 + ");\n";}
+enum_declare: ENUM SYMBOL '(' slist ')' {$$=NULL; "BAD_CODEGEN";//"^type " + $2 + " is (" + $4 + ");\n";
+            }
             ;
 
-module_block: mod_ref mod_conn {$$ = $1 + " " + $2 + ";\n"}
-            | mod_ref ':' mod_conns END {$$ = $1 + " " + $3 + ";\n"}
+module_block: mod_ref mod_conn {($1->connections = new Vlist())->push_back($2); $$=$1;}
+            | mod_ref ':' mod_conns END {$1->connections = $3; $$=$1;}
             ;
-mod_ref: MODULE '(' SYMBOL ')' {$$ = gen_sym() + $3;}
+mod_ref: MODULE '(' SYMBOL ')' {$$ = new SubModule($3);}
        ;
-mod_conn: GENERIC '(' explist ')' {$$ = "generic map(" + $3 + ")";}
-        | PORT    '(' explist ')' {$$ = "port map(" + $3 + ")";}
+mod_conn: GENERIC '(' explist ')' {$$ = new GenericBinding($3);}
+        | PORT    '(' explist ')' {$$ = new PortBinding($3);}
         ;
-mod_conns: mod_conn
-         | mod_conns mod_conn {$$ = $1 + " " + $2;}
-explist: expr
-       | explist ',' expr {$$ = $1 + ',' + $3;}
+mod_conns: mod_conn {($$=new Vlist())->push_back($1);}
+         | mod_conns mod_conn {($$=$1)->push_back($2);}
+explist: expr {$$ = new Vlist(); $$->push_back($1);}
+       | explist ',' expr {$$ = $1;$1->push_back($3);}
        ;
 

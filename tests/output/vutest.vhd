@@ -17,8 +17,8 @@ signal input:logv(3 downto 0);
 signal output:logv(15 downto 0);
 signal sysTick:log;
 begin
-ledg(6 downto 0)<=output(6 downto 0);
-ledr(6 downto 0)<=output(14 downto 8);
+ledg(7 downto 0)<=output(7 downto 0);
+ledr(7 downto 0)<=output(15 downto 8);
 with input select output <=
 "000000000000000" when X"0",
 "000000000000001" when X"1",

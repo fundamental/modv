@@ -7,7 +7,7 @@ find_package(Boost REQUIRED)
 
 set(BIN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(CMAKE_CXX_FLAGS "--std=gnu++0x")
+set(CMAKE_CXX_FLAGS "--std=gnu++0x -Wall -Wextra")
 
 BISON_TARGET(Parser modv.y ${BIN_DIR}/parse.cpp COMPILE_FLAGS "-v -t")
 FLEX_TARGET(Scanner modv.lex ${BIN_DIR}/lexer.cpp)
