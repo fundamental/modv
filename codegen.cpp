@@ -11,9 +11,17 @@ namespace CodeGen {
     using std::endl;
     using std::ostream;
     using std::string;
-    using std::type_info;
 
     bool ast = false;
+
+    void dealloc(Vlist *&v)
+    {
+        while(!v->empty()) {
+            delete v->front();
+            v->pop_front();
+        }
+        v = NULL;
+    }
 
     ostream &operator<<(ostream &o, const Value &v)
     {
@@ -47,8 +55,8 @@ namespace CodeGen {
 
     struct PortPrinter : public Value
     {
-        PortPrinter(const std::list<class Port*> &_v) :v(_v) {}
-        const std::list<class Port*> &v;
+        PortPrinter(const std::list<struct Port*> &_v) :v(_v) {}
+        const std::list<struct Port*> &v;
         ast_format0("(PortPrinter)");
         string code_string(void) const
         {

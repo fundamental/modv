@@ -99,59 +99,6 @@ string get_port(string &plist)
     plist = plist.substr(pos+1);
     return ret;
 }
-string format_ports(string plist)
-{
-    string ports, generics;
-    while(!plist.empty())
-    {
-        string port = get_port(plist);
-        char type = port[0];
-        port = port.substr(1);
-        if(type=='g')
-            generics += port + ";\n";
-        else
-            ports += port + ";\n";
-    }
-    if(!generics.empty())
-        generics.erase(generics.length()-2);
-    if(!ports.empty())
-        ports.erase(ports.length()-2);
-    string result = "port(" + ports + ");\n";
-    if(!generics.empty())
-        result = "generic(" + generics + ");\n" + result;
-    return result;
-}
-
-
-string make_sync(string clk, string extra="")
-{
-    string ret("if(rising_edge("+clk+")");
-
-    if(extra.empty())
-        return ret + ") then\n";
-    return ret + "and " + extra + ") then\n";
-}
-string make_syncfull(string init, string stmts)
-{
-    string ret("process(all)\nbegin\n");
-    int low;
-    if((low = stmts.find('@'))!=string::npos) { //handle async statements
-        int high = stmts.find('@',low+1);
-        ret += stmts.substr(low+1,high-1);
-        stmts.erase(low,high-low+2);
-    }
-
-    ret += init + stmts + "end if;\nend process;\n";
-    return ret;
-}
-string make_ternary(string var, string cond, string t_case, string f_case)
-{
-    if(insync)
-        return "if(" + cond + ") then\n " + var + "<= " + t_case + ";\nelse\n" +
-               var + "<= " + f_case + ";\nend if;\n";
-    else
-        return var + "<= " + t_case + " when " + cond + " else " + f_case + ";\n";
-}
 
 //TODO FIXME
 Vlist *make_async(Vlist *vstmts)
@@ -167,6 +114,8 @@ Vlist *make_signals(Vlist *names, Type *t)
         assert(sym);
         list->push_back(new Signal(sym, t));
     }
+    //remove unused list
+    delete names;
     return list;
 }
 

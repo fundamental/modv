@@ -22,6 +22,7 @@ namespace CodeGen {
     {
         virtual string ast_string(void) const=0;
         virtual string code_string(void) const=0;
+        virtual ~Value(void){};
     };
 
     struct Expr : public Value {};
