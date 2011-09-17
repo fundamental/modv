@@ -1,0 +1,32 @@
+Module VHDL
+-----------
+
+Module VHDL or modv is an experiment in rewriting the syntax of VHDL.
+Due to VHDL's ADA heritage, the syntax tends to be verbose, obscuring the
+meaning of code at some times.
+The overall new syntax takes inspiration from ruby's minimalism with an
+emphasis on blocks for describing designs
+
+Building
+~~~~~~~~
+
+modv is built with cmake and can be built by running:
+
+------------------------------------------------------
+    mkdir build
+    cd build
+    cmake ..
+    make
+------------------------------------------------------
+
+This should produce the modv compiler, which currently takes arguments in the
+form of "modv input-modv-file output-vhdl-file"
+
+What Is Being Done
+~~~~~~~~~~~~~~~~~~
+
+* Grammar is mostly complete
+* Parsing works, but suffers from dangling else issues
+* Code Generation works, but needs more extensive tests
+* No semantics analysis is done, basic work should be done here to indicate
+  programmatic errors before VHDL files are passed on to another tool
